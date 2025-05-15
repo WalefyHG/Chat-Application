@@ -1,0 +1,3 @@
+SUCCESS_STATUSES = frozenset([200, 201])
+ERROR_STATUSES = frozenset([400, 404, 500])
+NO_CONTENT_STATUSES = frozenset([204])

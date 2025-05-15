@@ -1,0 +1,1 @@
+omitted_fields = ('registration', 'last_user_id', 'last_modification')

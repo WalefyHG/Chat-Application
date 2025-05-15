@@ -1,0 +1,23 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "walefy lima",email = "walefylima@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "django-ninja-jwt (>=5.3.7,<6.0.0)",
+    "django-cors-headers (>=4.7.0,<5.0.0)",
+    "django-channels (>=0.7.0,<0.8.0)",
+    "uvicorn (>=0.34.2,<0.35.0)",
+    "daphne (>=4.1.2,<5.0.0)",
+    "channels (>=4.2.2,<5.0.0)",
+    "django-redis (>=5.4.0,<6.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
