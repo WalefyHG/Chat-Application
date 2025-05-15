@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from datetime import timedelta
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -56,6 +57,7 @@ THIRD_PARTY_APPS = [
     'ninja_extra',
     'ninja_jwt',
     'corsheaders',
+    'channels',
 ]
 
 LOCAL_APPS= [
@@ -98,6 +100,8 @@ TEMPLATES = [
     },
 ]
 
+ASGI_APPLICATION = 'core.asgi.application'
+
 WSGI_APPLICATION = 'core.wsgi.application'
 
 
@@ -112,12 +116,12 @@ DATABASES = {
 }
 
 CHANNEL_LAYERS = {
-    'default' : {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': ['127.0.1:6379'],
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
         },
-    }
+    },
 }
 
 CACHES = {
@@ -187,3 +191,7 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
     'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
 }
+
+
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')

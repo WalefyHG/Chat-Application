@@ -3,7 +3,7 @@ import os
 import django
 import tracemalloc
 from uvicorn import run
-from core.asgi import application
+from core.asgi import django_asgi_app
 from ninja_jwt.authentication import JWTAuth
 from channels.routing import URLRouter
 from channels.auth import AuthMiddlewareStack

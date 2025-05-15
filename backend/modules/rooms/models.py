@@ -6,7 +6,13 @@ class ChatRoom(models.Model):
     user1 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user1')
     user2 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user2')
     
-    last_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_room_last_user')
+    last_user = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="chat_room_last_user",
+    )
     
     @property
     def room_name(self):
@@ -34,7 +40,13 @@ class ChatMessage(models.Model):
     content = models.TextField()
     read = models.BooleanField(default=False)
     
-    last_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_message_last_user_message')
+    last_user = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="chat_message_last_user",
+    )
     
     
     def __str__(self):

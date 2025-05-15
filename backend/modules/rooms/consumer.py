@@ -41,6 +41,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         data = json.loads(text_data)
         message_type = data.get('type', 'message')
+        print(f"Received message type: {message_type}")
+        print(f"Received data: {data}")
         
         if message_type == 'message':
             if not self.user or not await self.is_user_authenticated(self.user):
@@ -56,7 +58,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 {
                     'type': 'chat_message',
                     'message': message.content,
-                    'username': self.user.user_name,
+                    'username': self.user.username,
                     'timestamp': str(message.timestamp),
                     'id': message.id,
                     'read': message.read
@@ -67,7 +69,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 {
                     'type': 'user_typing',
-                    'username': self.user.user_name,
+                    'username': self.user.username,
                 }
             )
         elif message_type == 'stop_typing':
@@ -75,7 +77,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 {
                     'type': 'user_stop_typing',
-                    'username': self.user.user_name,
+                    'username': self.user.username,
                 }
             )
         elif message_type == 'mark_as_read':
@@ -136,6 +138,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async 
     def create_message(self, user, room, message):
+        print(f"Creating message: {message}")
         return ChatMessage.objects.create(user=user, room=room, content=message)
 
     @database_sync_to_async
@@ -148,7 +151,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return [
             {
                 'id': message.id,
-                'username': message.user.user_name,
+                'username': message.user.username,
                 'message': message.content,
                 'timestamp': str(message.timestamp),
                 'read': message.read

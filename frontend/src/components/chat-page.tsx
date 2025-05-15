@@ -1,120 +1,183 @@
-"use client"
+import React, { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { chatService, userService, type Message, type User } from "../services/api";
+import { useAuth } from "../contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Loader, Send, ArrowLeft } from "lucide-react";
+import { format } from "date-fns";
+import { toast } from "sonner";
 
-import React, { useEffect, useRef, useState } from "react"
-import { ChatSocket, MessagePayload } from "@/lib/socket"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-
-interface ChatPageProps {
-    username: string
-    token: string
-    roomName: string               // <-- recebe o nome da sala
-    onLogout: () => void
-}
-
-export default function ChatPage({ username, token, roomName, onLogout }: ChatPageProps) {
-    const [messages, setMessages] = useState<MessagePayload[]>([])
-    const [newMessage, setNewMessage] = useState("")
-    const [isConnected, setIsConnected] = useState(false)
-    const scrollRef = useRef<HTMLDivElement>(null)
-    const chatSocket = useRef<ChatSocket | null>(null)
+const ChatPage: React.FC = () => {
+    const { userId } = useParams<{ userId: string }>();
+    const [chatUser, setChatUser] = useState<User | null>(null);
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [newMessage, setNewMessage] = useState("");
+    const [loading, setLoading] = useState(true);
+    const [sending, setSending] = useState(false);
+    const { user: currentUser } = useAuth();
+    const navigate = useNavigate();
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        // monta a URL incluindo a sala
-        const base = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/chat"
-        const WS_URL = `${base}/${encodeURIComponent(roomName)}/?token=${encodeURIComponent(token)}`
+        const fetchUserAndMessages = async () => {
+            if (!userId) return;
 
-        chatSocket.current = new ChatSocket(
-            WS_URL,
-            token,
-            (msg) => setMessages((prev) => [...prev, msg]),
-            () => setIsConnected(true),
-            () => setIsConnected(false),
-            () => onLogout()
-        )
-        chatSocket.current.connect()
+            try {
+                setLoading(true);
+                const users = await userService.getUsers();
+                const user = users.find((u: { id: number; }) => u.id === parseInt(userId));
 
-        return () => {
-            chatSocket.current?.disconnect()
-        }
-    }, [roomName, token, onLogout])
+                if (user) {
+                    setChatUser(user);
+                    const msgs = await chatService.getMessages(user.id.toString());
+                    setMessages(msgs);
+                } else {
+                    toast.error("Usuário não encontrado");
+                    navigate("/");
+                }
+            } catch (error) {
+                console.error("Error fetching chat data:", error);
+                toast.error("Erro ao carregar o chat");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchUserAndMessages();
+    }, [userId, navigate]);
 
     useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-        }
-    }, [messages])
+        scrollToBottom();
+    }, [messages]);
 
-    const handleSend = (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!newMessage.trim()) return
-        chatSocket.current?.send(newMessage.trim(), username)
-        setNewMessage("")
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    const handleSendMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!newMessage.trim() || !chatUser || sending) return;
+
+        try {
+            setSending(true);
+            const message = await chatService.sendMessage(chatUser.id.toString(), newMessage);
+            setMessages(prev => [...prev, message]);
+            setNewMessage("");
+        } catch (error) {
+            console.error("Error sending message:", error);
+            toast.error("Erro ao enviar mensagem");
+        } finally {
+            setSending(false);
+        }
+    };
+
+    const getInitials = (username: string) => {
+        return username.substring(0, 2).toUpperCase();
+    };
+
+    const formatMessageTime = (timestamp: string) => {
+        try {
+            return format(new Date(timestamp), "HH:mm");
+        } catch (e) {
+            return "";
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex h-full w-full items-center justify-center">
+                <Loader className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
     }
 
     return (
-        <Card className="w-full max-w-4xl h-[80vh] flex flex-col">
-            <CardHeader className="flex justify-between items-center">
-                <CardTitle>Chat: {roomName}</CardTitle>
-                <div className="flex items-center gap-4">
-                    <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`} />
-                    <span className="text-sm">{isConnected ? "Connected" : "Disconnected"}</span>
-                    <Button variant="outline" onClick={() => { chatSocket.current?.disconnect(); onLogout() }}>
-                        Logout
-                    </Button>
-                </div>
-            </CardHeader>
+        <div className="flex h-full w-full flex-col bg-gray-50 rounded-lg shadow-lg overflow-hidden">
+            {/* Chat Header */}
+            <div className="flex items-center bg-white p-4 shadow-sm">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="mr-2"
+                    onClick={() => navigate("/")}
+                >
+                    <ArrowLeft className="h-5 w-5" />
+                </Button>
 
-            <CardContent className="flex-grow overflow-hidden">
-                <ScrollArea ref={scrollRef} className="h-full pr-4">
-                    <div className="space-y-4">
-                        {messages.map((m) => (
-                            <div
-                                key={m.id}
-                                className={`flex items-start gap-2 ${m.sender === username ? "flex-row-reverse" : "flex-row"}`}
-                            >
-                                <Avatar className="h-8 w-8">
-                                    <AvatarFallback>{m.sender.substring(0, 2).toUpperCase()}</AvatarFallback>
-                                </Avatar>
-                                <div
-                                    className={`rounded-lg px-3 py-2 max-w-[70%] ${m.sender === username ? "bg-primary text-primary-foreground" : "bg-muted"
-                                        }`}
-                                >
-                                    <div className="flex flex-col">
-                                        <span className="text-xs font-medium mb-1">
-                                            {m.sender === username ? "You" : m.sender}
-                                        </span>
-                                        <span>{m.content}</span>
-                                        <span className="text-xs opacity-70 mt-1 text-right">
-                                            {new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                        {messages.length === 0 && (
-                            <div className="text-center text-gray-500 py-8">No messages yet. Start the conversation!</div>
-                        )}
+                {chatUser && (
+                    <div className="flex items-center">
+                        <Avatar className="h-10 w-10 mr-3">
+                            <AvatarImage src={chatUser.avatar} alt={chatUser.username} />
+                            <AvatarFallback>{getInitials(chatUser.username)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                            <h2 className="font-medium">{chatUser.username}</h2>
+                            <p className="text-xs text-gray-500">
+                                {chatUser.isOnline ? "Online" : "Offline"}
+                            </p>
+                        </div>
                     </div>
-                </ScrollArea>
-            </CardContent>
+                )}
+            </div>
 
-            <CardFooter>
-                <form onSubmit={handleSend} className="flex w-full gap-2">
-                    <Input
-                        placeholder="Type your message..."
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        disabled={!isConnected}
-                    />
-                    <Button type="submit" disabled={!isConnected || !newMessage.trim()}>
-                        Send
-                    </Button>
-                </form>
-            </CardFooter>
-        </Card>
-    )
-}
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {messages.map((message) => {
+                    const isMine = message.sender === currentUser?.id;
+
+                    return (
+                        <div
+                            key={message.id}
+                            className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
+                        >
+                            <div
+                                className={`max-w-[70%] rounded-lg px-4 py-2 ${isMine
+                                    ? 'bg-blue-500 text-white rounded-br-none'
+                                    : 'bg-gray-200 text-gray-800 rounded-bl-none'
+                                    }`}
+                            >
+                                <p className="break-words">{message.content}</p>
+                                <p className={`text-xs mt-1 ${isMine ? 'text-blue-100' : 'text-gray-500'
+                                    }`}>
+                                    {formatMessageTime(message.timestamp)}
+                                </p>
+                            </div>
+                        </div>
+                    );
+                })}
+                <div ref={messagesEndRef} />
+            </div>
+
+            {/* Message Input */}
+            <form
+                onSubmit={handleSendMessage}
+                className="border-t border-gray-200 bg-white p-4 flex gap-2"
+            >
+                <Input
+                    placeholder="Digite sua mensagem..."
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    className="flex-1"
+                />
+                <Button
+                    type="submit"
+                    disabled={!newMessage.trim() || sending}
+                >
+                    {sending ? (
+                        <Loader className="h-4 w-4 animate-spin" />
+                    ) : (
+                        <>
+                            <Send className="h-4 w-4" />
+                            <span className="ml-2">Enviar</span>
+                        </>
+                    )}
+                </Button>
+            </form>
+        </div>
+    );
+};
+
+export default ChatPage;
