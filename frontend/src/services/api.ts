@@ -1,3 +1,4 @@
+import { get } from "http";
 import { toast } from "sonner";
 
 const API_URL = "http://127.0.0.1:8000"; // Substitua pela URL da sua API Django
@@ -118,6 +119,31 @@ export const userService = {
             throw error;
         }
     },
+
+    getUserById: async (userId: number): Promise<User> => {
+        try {
+            const token = authService.getToken();
+            if (!token) throw new Error("Token não encontrado");
+
+            const response = await fetch(`${API_URL}/api/user/${userId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                }
+            });
+
+            if (response.status === 401) {
+                throw new Error("Não autorizado. Token inválido ou expirado.");
+            }
+
+            if (!response.ok) throw new Error('Falha ao obter usuário');
+
+            return await response.json();
+        } catch (error) {
+            toast.error("Erro ao carregar usuário: " + (error as Error).message);
+            throw error;
+        }
+    }
 
 };
 

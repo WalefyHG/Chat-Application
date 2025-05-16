@@ -18,7 +18,8 @@ const SelectUserPage: React.FC = () => {
         const fetchUsers = async () => {
             try {
                 const data = await userService.getUsers();
-                setUsers(data);
+                const filteredUsers = data.filter((user: User) => user.id !== currentUser?.id);
+                setUsers(filteredUsers);
             } catch (error) {
                 console.error("Failed to fetch users:", error);
                 toast.error("Erro ao carregar usuários.");

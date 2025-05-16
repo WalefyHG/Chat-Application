@@ -1,7 +1,7 @@
 
 'use client';
 
-import { chatService } from '@/services/api';
+import { chatService, userService } from '@/services/api';
 import React, { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,10 +34,26 @@ const Chat: React.FC<ChatProps> = ({ currentUserId, otherUserId }) => {
     const typingTimeout = useRef<NodeJS.Timeout | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const chatContainerRef = useRef<HTMLDivElement | null>(null);
+    const [receivedUser, setReceivedUser] = useState<any>(null);
 
     // Monta o nome da sala (room)
     const getRoomName = (id1: number, id2: number) =>
         id1 < id2 ? `${id1}_${id2}` : `${id2}_${id1}`;
+
+    useEffect(() => {
+        const fetchUser = async () => {
+            try {
+                const user = await userService.getUserById(otherUserId);
+                setReceivedUser(user);
+                console.log("Usuário recebido:", user);
+            }
+            catch (error) {
+                console.error("Erro ao buscar usuário:", error);
+            }
+        };
+        fetchUser();
+    }, [otherUserId])
+
 
     useEffect(() => {
         const roomName = getRoomName(currentUserId, otherUserId);
@@ -57,11 +73,12 @@ const Chat: React.FC<ChatProps> = ({ currentUserId, otherUserId }) => {
             // Carrega mensagens anteriores via API REST
             chatService.getMessages(roomName).then((initialMessages) => {
                 // Transforme mensagens no formato esperado
+                console.log("Mensagens antigas:", initialMessages);
                 const formatted = initialMessages.map((msg: any) => ({
                     id: msg.id,
                     content: msg.message || msg.content,
                     username: msg.username,
-                    senderId: msg.username === currentUser.username ? currentUserId : otherUserId,
+                    senderId: msg.sender.id === currentUser.id ? currentUserId : otherUserId,
                     timestamp: msg.timestamp,
                     read: msg.read,
                 }));
@@ -197,7 +214,7 @@ const Chat: React.FC<ChatProps> = ({ currentUserId, otherUserId }) => {
             {/* Chat Header */}
             <div className="p-4 border-b border-border bg-card">
                 <h2 className="text-lg font-semibold text-card-foreground">
-                    Conversando com Usuário #{otherUserId}
+                    Conversando com {receivedUser?.username} - # {otherUserId}
                 </h2>
             </div>
 

@@ -3,15 +3,27 @@
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Chat from "../../../hooks/chat-socket";
-import { use } from "react";
+import { Loader } from "lucide-react";
 
 const ChatPage: React.FC = () => {
     const router = useRouter();
-    const { user: currentUser } = useAuth();
+    const { user: currentUser, loading } = useAuth();
     const searchParams = useParams();
     const userId = searchParams ? searchParams?.user_id : null;
 
-    if (!currentUser || !userId) return <div>Carregando...</div>;
+    if (loading || !userId) {
+        return (
+            <div className="flex h-full w-full items-center justify-center">
+                <Loader className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    if (!currentUser) {
+        // Usuário não autenticado
+        router.push('/');
+        return null;
+    }
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
