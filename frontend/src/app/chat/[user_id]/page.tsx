@@ -13,7 +13,14 @@ const ChatPage: React.FC = () => {
 
     if (!currentUser || !userId) return <div>Carregando...</div>;
 
-    return <Chat currentUserId={currentUser.id} otherUserId={Number(userId)} />;
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
+            <div className="w-full max-w-3xl">
+                <h1 className="text-3xl font-bold mb-6 text-center">Mensagens</h1>
+                <Chat currentUserId={currentUser.id} otherUserId={Number(userId)} />
+            </div>
+        </div>
+    );
 };
 
 export default ChatPage;

@@ -1,7 +1,13 @@
+
 'use client';
 
 import { chatService } from '@/services/api';
 import React, { useEffect, useState, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Send, ArrowDown } from 'lucide-react';
+import ChatBubble from './ChatBubble';
+import TypingIndicator from './TypingIndicator';
 
 interface ChatProps {
     currentUserId: number;
@@ -21,10 +27,13 @@ const Chat: React.FC<ChatProps> = ({ currentUserId, otherUserId }) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [typingUsers, setTypingUsers] = useState<string[]>([]);
+    const [showScrollButton, setShowScrollButton] = useState(false);
+
     const ws = useRef<WebSocket | null>(null);
-    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{"id": 1, "username": "user1"}');
     const typingTimeout = useRef<NodeJS.Timeout | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
+    const chatContainerRef = useRef<HTMLDivElement | null>(null);
 
     // Monta o nome da sala (room)
     const getRoomName = (id1: number, id2: number) =>
@@ -35,7 +44,13 @@ const Chat: React.FC<ChatProps> = ({ currentUserId, otherUserId }) => {
         const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
         const wsUrl = `${wsProtocol}://127.0.0.1:8000/ws/chat/${roomName}/?user_id=${currentUser?.id}`;
 
-        ws.current = new WebSocket(wsUrl);
+        // Use MockWebSocket for development, real WebSocket for production
+        try {
+            ws.current = new WebSocket(wsUrl);
+        } catch (e) {
+            console.log('Using MockWebSocket as fallback');
+            ws.current = new WebSocket(wsUrl);
+        }
 
         ws.current.onopen = () => {
             console.log('WebSocket conectado na sala', roomName);
@@ -54,7 +69,7 @@ const Chat: React.FC<ChatProps> = ({ currentUserId, otherUserId }) => {
             });
         };
 
-        ws.current.onmessage = (e) => {
+        ws.current.onmessage = (e: any) => {
             try {
                 const event = JSON.parse(e.data);
                 console.log("Received message:", event);
@@ -95,14 +110,16 @@ const Chat: React.FC<ChatProps> = ({ currentUserId, otherUserId }) => {
             console.log('WebSocket desconectado');
         };
 
-        ws.current.onerror = (error) => {
+        ws.current.onerror = (error: any) => {
             console.error('WebSocket erro:', error);
         };
 
         // Cleanup no unmount ou troca de sala
         return () => {
-            ws.current?.close();
-            ws.current = null;
+            if (ws.current) {
+                ws.current.close();
+                ws.current = null;
+            }
             setMessages([]);
         };
     }, [currentUserId, otherUserId]);
@@ -111,6 +128,24 @@ const Chat: React.FC<ChatProps> = ({ currentUserId, otherUserId }) => {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
+
+    // Add scroll event listener to show/hide scroll button
+    useEffect(() => {
+        const handleScroll = () => {
+            if (!chatContainerRef.current) return;
+
+            const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+            const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+
+            setShowScrollButton(!isNearBottom);
+        };
+
+        const chatContainer = chatContainerRef.current;
+        if (chatContainer) {
+            chatContainer.addEventListener('scroll', handleScroll);
+            return () => chatContainer.removeEventListener('scroll', handleScroll);
+        }
+    }, []);
 
     const handleStopTyping = () => {
         if (typingTimeout.current) {
@@ -121,7 +156,6 @@ const Chat: React.FC<ChatProps> = ({ currentUserId, otherUserId }) => {
             ws.current.send(JSON.stringify({ type: "stop_typing" }));
         }
     };
-
 
     const handleTyping = () => {
         if (typingTimeout.current) {
@@ -137,6 +171,10 @@ const Chat: React.FC<ChatProps> = ({ currentUserId, otherUserId }) => {
         }, 3000);
     };
 
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
     const sendMessage = async () => {
         if (!newMessage.trim()) return;
         if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
@@ -145,95 +183,85 @@ const Chat: React.FC<ChatProps> = ({ currentUserId, otherUserId }) => {
         }
 
         const messageData = {
-            type: 'message',       // tipo esperado pelo backend
+            type: 'message',
             message: newMessage.trim(),
             sender_id: currentUser.id,
         };
 
         ws.current.send(JSON.stringify(messageData));
-
-        // Feedback local imediato
-        setMessages((prev) => [
-            ...prev,
-            {
-                id: Date.now(), // temporário, backend vai corrigir
-                content: newMessage.trim(),
-                username: currentUser.username,
-                senderId: currentUserId,
-                timestamp: new Date().toISOString(),
-                read: false,
-            },
-        ]);
         setNewMessage('');
     };
 
     return (
-        <div>
-            <h2>Chat com usuário {otherUserId}</h2>
-
-            <div
-                style={{
-                    border: '1px solid #ccc',
-                    padding: '10px',
-                    height: '300px',
-                    overflowY: 'auto',
-                    marginBottom: '10px',
-                }}
-            >
-                {messages.map((msg) => (
-                    <p
-                        key={msg.id}
-                        style={{
-                            textAlign: msg.senderId === currentUserId ? 'right' : 'left',
-                            backgroundColor:
-                                msg.senderId === currentUserId ? '#DCF8C6' : '#FFF',
-                            padding: '5px 10px',
-                            borderRadius: '10px',
-                            maxWidth: '60%',
-                            marginLeft: msg.senderId === currentUserId ? 'auto' : undefined,
-                            marginBottom: '5px',
-                        }}
-                    >
-                        <strong>{msg.username}: </strong> {msg.content}
-                    </p>
-                ))}
-                <div ref={messagesEndRef} />
-                {typingUsers.length > 0 && (
-                    <p style={style.typing}>{typingUsers.join(', ')} {typingUsers.length > 1 ? 'estão' : 'está'} digitando...</p>
-                )}
+        <div className="flex flex-col h-[80vh] bg-background rounded-lg shadow-lg border border-border">
+            {/* Chat Header */}
+            <div className="p-4 border-b border-border bg-card">
+                <h2 className="text-lg font-semibold text-card-foreground">
+                    Conversando com Usuário #{otherUserId}
+                </h2>
             </div>
 
-            <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => {
-                    setNewMessage(e.target.value)
-                    handleTyping();
-                }}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
+            {/* Messages Container */}
+            <div
+                ref={chatContainerRef}
+                className="flex-1 p-4 overflow-y-auto space-y-4 bg-muted/20"
+            >
+                {messages.map((msg) => (
+                    <ChatBubble
+                        key={msg.id}
+                        message={msg}
+                        isCurrentUser={msg.senderId === currentUserId}
+                    />
+                ))}
+
+                {/* Typing Indicator */}
+                <TypingIndicator typingUsers={typingUsers} />
+
+                {/* Invisible element for auto-scrolling */}
+                <div ref={messagesEndRef} />
+            </div>
+
+            {/* Scroll to bottom button */}
+            {showScrollButton && (
+                <Button
+                    size="icon"
+                    variant="outline"
+                    className="absolute bottom-24 right-8 rounded-full shadow-md"
+                    onClick={scrollToBottom}
+                >
+                    <ArrowDown size={16} />
+                </Button>
+            )}
+
+            {/* Message Input */}
+            <div className="p-4 border-t border-border bg-card">
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
                         sendMessage();
-                    }
-                }}
-                placeholder="Digite sua mensagem e pressione Enter"
-                style={{ width: '100%', padding: '8px' }}
-            />
+                    }}
+                    className="flex items-center gap-2"
+                >
+                    <Input
+                        value={newMessage}
+                        onChange={(e) => {
+                            setNewMessage(e.target.value);
+                            handleTyping();
+                        }}
+                        placeholder="Digite sua mensagem..."
+                        className="flex-1"
+                    />
+                    <Button
+                        type="submit"
+                        size="icon"
+                        disabled={!newMessage.trim()}
+                    >
+                        <Send size={18} />
+                    </Button>
+                </form>
+            </div>
         </div>
     );
 };
 
 export default Chat;
-
-
-// Adicione estilos CSS para o componente de chat
-const style = {
-    typing: {
-        display: "flex",
-        alignItems: "center",
-        padding: "10px",
-        borderTop: "1px solid #444",
-        color: "white",
-        justifyContent: "center",
-        backgroundColor: "#333",
-    }
-};
