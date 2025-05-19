@@ -2,12 +2,14 @@
 'use client';
 
 import { chatService, userService } from '@/services/api';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, use } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, ArrowDown } from 'lucide-react';
 import ChatBubble from './ChatBubble';
 import TypingIndicator from './TypingIndicator';
+import data from '@emoji-mart/data';
+import Picker from '@emoji-mart/react';
 
 interface ChatProps {
     currentUserId: number;
@@ -28,6 +30,7 @@ const Chat: React.FC<ChatProps> = ({ currentUserId, otherUserId }) => {
     const [newMessage, setNewMessage] = useState('');
     const [typingUsers, setTypingUsers] = useState<string[]>([]);
     const [showScrollButton, setShowScrollButton] = useState(false);
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
     const ws = useRef<WebSocket | null>(null);
     const currentUser = JSON.parse(localStorage.getItem('user') || '{"id": 1, "username": "user1"}');
@@ -35,6 +38,24 @@ const Chat: React.FC<ChatProps> = ({ currentUserId, otherUserId }) => {
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const chatContainerRef = useRef<HTMLDivElement | null>(null);
     const [receivedUser, setReceivedUser] = useState<any>(null);
+    const emojiPickerRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+                setShowEmojiPicker(false);
+            }
+        };
+
+        if (showEmojiPicker) {
+            document.addEventListener('click', handleClickOutside);
+        } else {
+            document.removeEventListener('click', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('click', handleClickOutside);
+        };
+    }, [showEmojiPicker])
 
     // Monta o nome da sala (room)
     const getRoomName = (id1: number, id2: number) =>
@@ -259,6 +280,32 @@ const Chat: React.FC<ChatProps> = ({ currentUserId, otherUserId }) => {
                     }}
                     className="flex items-center gap-2"
                 >
+                    {/* Botão do emoji */}
+                    <div className="relative">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setShowEmojiPicker((prev) => !prev)}
+                        >
+                            😊
+                        </Button>
+                        {showEmojiPicker && (
+                            <div
+                                ref={emojiPickerRef}
+                                className="absolute bottom-12 right-0 z-50"
+                            >
+                                <Picker
+                                    data={data}
+                                    onEmojiSelect={(emoji: any) => {
+                                        setNewMessage((prev) => prev + (emoji.native || emoji.colons || ''));
+                                    }}
+                                    theme="light"
+                                    title="Escolha um emoji"
+                                />
+                            </div>
+                        )}
+                    </div>
+
                     <Input
                         value={newMessage}
                         onChange={(e) => {

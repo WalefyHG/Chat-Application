@@ -15,6 +15,7 @@ const SelectUserPage: React.FC = () => {
     const navigate = useRouter();
 
     useEffect(() => {
+        if (!currentUser) return;
         const fetchUsers = async () => {
             try {
                 const data = await userService.getUsers();
@@ -29,7 +30,7 @@ const SelectUserPage: React.FC = () => {
         };
 
         fetchUsers();
-    }, []);
+    }, [currentUser]);
 
     const handleUserClick = (userId: number) => {
         navigate.push(`/chat/${userId}`);
